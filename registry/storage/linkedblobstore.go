@@ -325,30 +325,33 @@ func (lbs *linkedBlobStore) newBlobUpload(ctx context.Context, uuid, path string
 // linkBlob links a valid, written blob into the registry under the named
 // repository for the upload controller.
 func (lbs *linkedBlobStore) linkBlob(ctx context.Context, canonical v1.Descriptor, aliases ...digest.Digest) error {
-	dgsts := append([]digest.Digest{canonical.Digest}, aliases...)
+	dcontext.GetLogger(ctx).Infof("Linking blob called for %q", canonical.Digest.String())
+	// dgsts := append([]digest.Digest{canonical.Digest}, aliases...)
 
 	// TODO(stevvooe): Need to write out mediatype for only canonical hash
 	// since we don't care about the aliases. They are generally unused except
 	// for tarsum but those versions don't care about mediatype.
 
 	// Don't make duplicate links.
-	seenDigests := make(map[digest.Digest]struct{}, len(dgsts))
+	// seenDigests := make(map[digest.Digest]struct{}, len(dgsts))
 
-	for _, dgst := range dgsts {
-		if _, seen := seenDigests[dgst]; seen {
-			continue
-		}
-		seenDigests[dgst] = struct{}{}
+	//vitshev
 
-		blobLinkPath, err := lbs.linkPath(lbs.repository.Named().Name(), dgst)
-		if err != nil {
-			return err
-		}
-
-		if err := lbs.blobStore.link(ctx, blobLinkPath, canonical.Digest); err != nil {
-			return err
-		}
-	}
+	//for _, dgst := range dgsts {
+	//	if _, seen := seenDigests[dgst]; seen {
+	//		continue
+	//	}
+	//	seenDigests[dgst] = struct{}{}
+	//
+	//	blobLinkPath, err := lbs.linkPath(lbs.repository.Named().Name(), dgst)
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	if err := lbs.blobStore.link(ctx, blobLinkPath, canonical.Digest); err != nil {
+	//		return err
+	//	}
+	//}
 
 	return nil
 }
@@ -367,12 +370,43 @@ type linkedBlobStatter struct {
 var _ distribution.BlobDescriptorService = &linkedBlobStatter{}
 
 func (lbs *linkedBlobStatter) Stat(ctx context.Context, dgst digest.Digest) (v1.Descriptor, error) {
-	blobLinkPath, err := lbs.linkPath(lbs.repository.Named().Name(), dgst)
+	dcontext.GetLogger(ctx).Infof("Linked Blob Stat called for %s", dgst)
+
+	// vitshev
+	// blobLinkPath, err := lbs.linkPath(lbs.repository.Named().Name(), dgst)
+
+	// if err != nil {
+	// return v1.Descriptor{}, err
+	// }
+
+	//target, err := lbs.blobStore.readlink(ctx, blobLinkPath)
+	//if err != nil {
+	//	switch err := err.(type) {
+	//	case driver.PathNotFoundError:
+	//		return v1.Descriptor{}, distribution.ErrBlobUnknown
+	//	default:
+	//		return v1.Descriptor{}, err
+	//	}
+	//}
+	//
+	//if target != dgst {
+	//	// Track when we are doing cross-digest domain lookups. ie, sha512 to sha256.
+	//	dcontext.GetLogger(ctx).Warnf("looking up blob with canonical target: %v -> %v", dgst, target)
+	//}
+
+	// TODO(stevvooe): Look up repository local mediatype and replace that on
+	// the returned descriptor.
+
+	// return lbs.blobStore.statter.Stat(ctx, target)
+
+	currentBlobPath, err := pathFor(blobDataPathSpec{digest: dgst})
+
 	if err != nil {
 		return v1.Descriptor{}, err
 	}
 
-	target, err := lbs.blobStore.readlink(ctx, blobLinkPath)
+	_, err = lbs.driver.Stat(ctx, currentBlobPath)
+
 	if err != nil {
 		switch err := err.(type) {
 		case driver.PathNotFoundError:
@@ -382,24 +416,20 @@ func (lbs *linkedBlobStatter) Stat(ctx context.Context, dgst digest.Digest) (v1.
 		}
 	}
 
-	if target != dgst {
-		// Track when we are doing cross-digest domain lookups. ie, sha512 to sha256.
-		dcontext.GetLogger(ctx).Warnf("looking up blob with canonical target: %v -> %v", dgst, target)
-	}
-
-	// TODO(stevvooe): Look up repository local mediatype and replace that on
-	// the returned descriptor.
-
-	return lbs.blobStore.statter.Stat(ctx, target)
+	return lbs.blobStore.statter.Stat(ctx, dgst)
 }
 
 func (lbs *linkedBlobStatter) Clear(ctx context.Context, dgst digest.Digest) (err error) {
-	blobLinkPath, err := lbs.linkPath(lbs.repository.Named().Name(), dgst)
-	if err != nil {
-		return err
-	}
+	// vitshev
+	// Pretend that we delete links
+	//blobLinkPath, err := lbs.linkPath(lbs.repository.Named().Name(), dgst)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//return lbs.blobStore.driver.Delete(ctx, blobLinkPath)
 
-	return lbs.blobStore.driver.Delete(ctx, blobLinkPath)
+	return nil
 }
 
 func (lbs *linkedBlobStatter) SetDescriptor(ctx context.Context, dgst digest.Digest, desc v1.Descriptor) error {
@@ -410,6 +440,12 @@ func (lbs *linkedBlobStatter) SetDescriptor(ctx context.Context, dgst digest.Dig
 // blobLinkPath provides the path to the blob link, also known as layers.
 func blobLinkPath(name string, dgst digest.Digest) (string, error) {
 	return pathFor(layerLinkPathSpec{name: name, digest: dgst})
+}
+
+// vitshev
+// blobPath provides the path to the real blob
+func blobPath(name string, dgst digest.Digest) (string, error) {
+	return pathFor(blobPathSpec{digest: dgst})
 }
 
 // manifestRevisionLinkPath provides the path to the manifest revision link.
