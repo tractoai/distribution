@@ -104,7 +104,14 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 		return http.HandlerFunc(apiBase)
 	})
 	app.register(v2.RouteNameManifest, manifestDispatcher)
-	app.register(v2.RouteNameCatalog, catalogDispatcher)
+
+	catalogDisabled := os.Getenv("REGISTRY_CATALOG_DISABLED")
+	if strings.ToLower(catalogDisabled) != "true" {
+		app.register(v2.RouteNameCatalog, catalogDispatcher)
+	} else {
+		dcontext.GetLogger(app).Info("Catalog endpoint is disabled via REGISTRY_CATALOG_DISABLED")
+	}
+
 	app.register(v2.RouteNameTags, tagsDispatcher)
 	app.register(v2.RouteNameBlob, blobDispatcher)
 	app.register(v2.RouteNameBlobUpload, blobUploadDispatcher)
