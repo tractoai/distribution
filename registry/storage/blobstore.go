@@ -135,12 +135,18 @@ func (bs *blobStore) path(dgst digest.Digest) (string, error) {
 func (bs *blobStore) link(ctx context.Context, path string, dgst digest.Digest) error {
 	// The contents of the "link" file are the exact string contents of the
 	// digest, which is specified in that package.
-	return bs.driver.PutContent(ctx, path, []byte(dgst))
+	currentBlobPath, err := pathFor(blobDataPathSpec{digest: dgst})
+
+	if err != nil {
+		return err
+	}
+
+	return bs.driver.Link(ctx, path, currentBlobPath, []byte(dgst))
 }
 
 // readlink returns the linked digest at path.
 func (bs *blobStore) readlink(ctx context.Context, path string) (digest.Digest, error) {
-	content, err := bs.driver.GetContent(ctx, path)
+	content, err := bs.driver.ReadLink(ctx, path)
 	if err != nil {
 		return "", err
 	}

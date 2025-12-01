@@ -110,6 +110,10 @@ type StorageDriver interface {
 	// will continue the traversal.
 	// If the returned error from the WalkFn is ErrFilledBuffer, processing stops.
 	Walk(ctx context.Context, path string, f WalkFn, options ...func(*WalkOptions)) error
+
+	Link(ctx context.Context, path string, targetPath string, content []byte) error
+
+	ReadLink(ctx context.Context, path string) ([]byte, error)
 }
 
 // FileWriter provides an abstraction for an opened writable file-like object in

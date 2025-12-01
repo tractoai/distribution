@@ -19,6 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/net/http2"
@@ -188,7 +189,15 @@ func NewRegistry(ctx context.Context, config *configuration.Configuration) (*Reg
 // This instrumentation tracks each HTTP request, creating spans with names derived from the request method and URL path.
 func otelHandler(next http.Handler) http.Handler {
 	return otelhttp.NewHandler(next, "",
-		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string { return r.Method + " " + r.URL.Path }))
+		[]otelhttp.Option{
+			otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string { return r.Method + " " + r.URL.Path }),
+			otelhttp.WithMetricAttributesFn(func(r *http.Request) []attribute.KeyValue {
+				return []attribute.KeyValue{
+					attribute.String("request_id", dcontext.GetRequestID(r.Context())),
+				}
+			}),
+		}...,
+	)
 }
 
 // takes a list of cipher suites and converts it to a list of respective tls constants
